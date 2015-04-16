@@ -5,7 +5,9 @@
 
 using namespace std;
 
-//If a pixel has values[r, g, b], take the greyscale value to be .299*r + .587g + .114b
+/*
+	This function takes in a color BMPImage and outputs a greyscale version of the image.
+*/
 void greyscaleFunction(BMPImage *image) {
 	
 	float r, g, b;
@@ -20,41 +22,48 @@ void greyscaleFunction(BMPImage *image) {
 	}
 }
 
-void correlationFunction(BMPImage *image, float filter, int m, int n) {
+/*
+	Correlates a filter value on an image. This function takes in a greyscale BMPImage, and a separable 
+	filter with n x n dimensions and a uniform filter value. The filter value parameter should be the 
+	value before separation. For instance, if the box filter has all values of 1/49, then 1/49 should be 
+	used as input, as this function will separate the box filter into two 1D filters with the value of 1/7. 
+	The function then applies the two 1D filters to the image.
+*/
+void correlationFunction(BMPImage *image, float filter, int n) {
 
-	float greyVal, pixelVal, filterVal;
+	float readVal, writeVal, filterVal;
 	filterVal = sqrt(filter);
 
 	//for each pixel in the image
 	for (int y = 0; y < image->getYSize(); y++) {
 		for (int x = 0; x < image->getXSize(); x++) {
 
-			pixelVal = 0;
-			greyVal = 0;
+			writeVal = 0;
+			readVal = 0;
 
 			//filter across x
 			for (int i = -1 * (n / 2); i <= (n / 2); i++) {
 
-				int paddingXCoord = x + i;
+				int offsetXCoord = x + i;
 
-				if (paddingXCoord <= 0) {
+				if (offsetXCoord <= 0) {
 					//use left most value in row
-					image->readPixel(0, y, greyVal, greyVal, greyVal);
-					pixelVal += greyVal * filterVal;
+					image->readPixel(0, y, readVal, readVal, readVal);
+					writeVal += readVal * filterVal;
 				}
-				else if (paddingXCoord >= image->getXSize() - 1) {
+				else if (offsetXCoord >= image->getXSize() - 1) {
 					//use right most value in row
-					image->readPixel(image->getXSize() - 1, y, greyVal, greyVal, greyVal);
-					pixelVal += greyVal * filterVal;
+					image->readPixel(image->getXSize() - 1, y, readVal, readVal, readVal);
+					writeVal += readVal * filterVal;
 				}
 				else {
-					//use value at position i in row
-					image->readPixel(paddingXCoord, y, greyVal, greyVal, greyVal);
-					pixelVal += greyVal * filterVal;
+					//use value at offset in row
+					image->readPixel(offsetXCoord, y, readVal, readVal, readVal);
+					writeVal += readVal * filterVal;
 				}
 
 			}
-			image->writePixel(x, y, pixelVal, pixelVal, pixelVal);
+			image->writePixel(x, y, writeVal, writeVal, writeVal);
 		}
 	}
 
@@ -62,118 +71,150 @@ void correlationFunction(BMPImage *image, float filter, int m, int n) {
 	for (int y = 0; y < image->getYSize(); y++) {
 		for (int x = 0; x < image->getXSize(); x++) {
 
-			pixelVal = 0;
-			greyVal = 0;
+			writeVal = 0;
+			readVal = 0;
 
 			//filter across y
-			for (int j = -1 * (n / 2); j <= (n / 2); j++) {
+			for (int i = -1 * (n / 2); i <= (n / 2); i++) {
 
-				int paddingYCoord = y + j;
+				int offsetYCoord = y + i;
 
-				if (paddingYCoord <= 0) {
+				//padding left
+				if (offsetYCoord <= 0) {
 					//use top most value in column
-					image->readPixel(x, 0, greyVal, greyVal, greyVal);
-					pixelVal += greyVal * filterVal;
+					image->readPixel(x, 0, readVal, readVal, readVal);
+					writeVal += readVal * filterVal;
 				}
-				else if (paddingYCoord >= image->getYSize() - 1) {
+				//padding right
+				else if (offsetYCoord >= image->getYSize() - 1) {
 					//use top most value in column
-					image->readPixel(x, image->getYSize() - 1, greyVal, greyVal, greyVal);
-					pixelVal += greyVal * filterVal;
+					image->readPixel(x, image->getYSize() - 1, readVal, readVal, readVal);
+					writeVal += readVal * filterVal;
 				}
 				else {
-					//use value at position i in row
-					image->readPixel(x, paddingYCoord, greyVal, greyVal, greyVal);
-					pixelVal += greyVal * filterVal;
+					//use value at offset in column
+					image->readPixel(x, offsetYCoord, readVal, readVal, readVal);
+					writeVal += readVal * filterVal;
 				}
 
 			}
-			image->writePixel(x, y, pixelVal, pixelVal, pixelVal);
+			image->writePixel(x, y, writeVal, writeVal, writeVal);
 		}
 	}
+}
 
-	/*
-	//for each pixel in the image
-	for (int y = 0; y < image->getYSize(); y++) {
-		for (int x = 0; x < image->getXSize(); x++) {
+/*
+	Correlates a 1D filter on an image. This function takes in a greyscale BMPImage, a pointer 
+	to a 1D filter, and the dimension of the 1D filter. This function uses the 1D filter twice 
+	to simulate the affect of applying a separable filter.
+*/
+void correlationFunction(BMPImage *image, float *filter, int n) {
 
-			pixelVal = 0;
-			greyVal = 0;
+	float readVal, writeVal;
 
-			//for each item in the filter
-			for (int j = -1 * (n / 2); j <= (m / 2); j++) {
-				for (int i = -1 * (m / 2); i <= (m / 2); i++) {
+	for (int x = 0; x < image->getXSize() - 1; x++) {
+		for (int y = 0; y < image->getYSize() - 1; y++) {
 
-					int paddingXCoord = x + i;
-					int paddingYCoord = y + j;
-					
-					if ((paddingXCoord) <= 0 && (paddingYCoord) <= 0) {
-						//use top left value in image
-						image->readPixel(0, 0, greyVal, greyVal, greyVal);
-						pixelVal += greyVal * filter;
-					}
-					else if (paddingXCoord >= image->getXSize() - 1 && paddingYCoord <= 0) {
-						//use top right value in image
-						image->readPixel(image->getXSize() - 1, 0, greyVal, greyVal, greyVal);
-						pixelVal += greyVal * filter;
-					}
-					else if (paddingXCoord <= 0 && paddingYCoord >= image->getYSize() - 1) {
-						//use bottom left value in image
-						image->readPixel(0, image->getYSize() - 1, greyVal, greyVal, greyVal);
-						pixelVal += greyVal * filter;
-					}
-					else if (paddingXCoord >= image->getXSize() - 1 && paddingYCoord >= image->getYSize() - 1) {
-						//use bottom right value in image
-						image->readPixel(image->getXSize() - 1, image->getYSize() - 1, greyVal, greyVal, greyVal);
-						pixelVal += greyVal * filter;
-					}
-					else if (paddingXCoord <= 0 && paddingYCoord > 0) {
-						//use left value in image
-						image->readPixel(0, paddingYCoord, greyVal, greyVal, greyVal);
-						pixelVal += greyVal * filter;
-					}
-					else if (paddingXCoord >= image->getXSize() - 1 && paddingYCoord > 0) {
-						//use right value in image
-						image->readPixel(image->getXSize() - 1, paddingYCoord, greyVal, greyVal, greyVal);
-						pixelVal += greyVal * filter;
-					}
-					else if (paddingXCoord > 0 && paddingYCoord <= 0) {
-						//use top value in image
-						image->readPixel(paddingXCoord, 0, greyVal, greyVal, greyVal);
-						pixelVal += greyVal * filter;
-					}
-					else if (paddingXCoord > 0 && paddingYCoord >= image->getYSize() - 1) {
-						//use bottom value in image
-						image->readPixel(paddingXCoord, image->getYSize() - 1, greyVal, greyVal, greyVal);
-						pixelVal += greyVal * filter;
-					}
-					else {
-						//use value in image
-						image->readPixel(paddingXCoord, paddingYCoord, greyVal, greyVal, greyVal);
-						pixelVal += greyVal * filter;
-					}
-					
+			writeVal = 0;
+			readVal = 0;
+
+			int j = 0; //filter value location
+			//filter across x
+			for (int i = -1 * (n / 2); i <= (n / 2); i++) {
+				
+				int offsetXCoord = x + i;
+
+				//padding left
+				if (offsetXCoord <= 0) {
+					//use left most value in row
+					image->readPixel(0, y, readVal, readVal, readVal);
+					writeVal += readVal * filter[j];
 				}
+				//padding right
+				else if (offsetXCoord >= image->getXSize() - 1) {
+					//use right most value in row
+					image->readPixel(image->getXSize() - 1, y, readVal, readVal, readVal);
+					writeVal += readVal * filter[j];
+				}
+				else {
+					//use value at offset in row
+					image->readPixel(offsetXCoord, y, readVal, readVal, readVal);
+					writeVal += readVal * filter[j];
+				}
+				j++; //next location in filter
 			}
-			
-			image->writePixel(x, y, pixelVal, pixelVal, pixelVal);
-
+			image->writePixel(x, y, writeVal, writeVal, writeVal);
 		}
 	}
-	*/
+	
+	for (int x = 0; x < image->getXSize() - 1; x++) {
+		for (int y = 0; y < image->getYSize() - 1; y++) {
+
+			writeVal = 0;
+			readVal = 0;
+
+			int j = 0; //filter value location
+			//filter across y
+			for (int i = -1 * (n / 2); i <= (n / 2); i++) {
+
+				int offsetYCoord = y + i;
+
+				//padding top
+				if (offsetYCoord <= 0) {
+					//use top most value in column
+					image->readPixel(x, 0, readVal, readVal, readVal);
+					writeVal += readVal * filter[j];
+				}
+				//padding bottom
+				else if (offsetYCoord >= image->getYSize() - 1) {
+					//use bottom most value in column
+					image->readPixel(x, image->getYSize() - 1, readVal, readVal, readVal);
+					writeVal += readVal * filter[j];
+				}
+				else {
+					//use value at offset in column
+					image->readPixel(x, offsetYCoord, readVal, readVal, readVal);
+					writeVal += readVal * filter[j];
+				}
+				j++; //next location in filter
+			}
+			image->writePixel(x, y, writeVal, writeVal, writeVal);
+		}
+	}
 }
 
-void correlationFunction(BMPImage *image, float *xFilter, float *yFilter, int numX, int numY) {
+/*
+	Creates a gaussian filter. This function takes in a value for sigma and a pointer to an integer.
+	The function will create a new 1D filter and populate it with values for the gaussian filter. The
+	function will return a pointer to the 1D filter, and will modify the integer pointer to reflect the
+	dimension of the filter.
+*/
+float* filterGaussianFunction(float sigma, int *dimen) {
+	const float PI = 3.1415927;
+
+	int filterDimen = 2 * (ceilf(3 * sigma)) + 1;
+
+	float *filter = new float[filterDimen];
+
+	int j = 0; //index in the filter
+	//populate the filter
+	for (int i = -1 * (filterDimen / 2); i <= (filterDimen / 2); i++) {
+		//calculate filter value and place in filter
+		filter[j] = sqrt(1 / (2 * sigma * sqrt(2 * PI))) *exp(-1 * (i * i) / (2 * sigma * sigma));
+		j++;
+	}
+
+	//normalize the filter values
+	float sum = 0.0f;
+	for (int i = 0; i < filterDimen; i++) {
+		sum += filter[i];
+	}
+	for (int i = 0; i < filterDimen; i++) {
+		filter[i] = (filter[i] / sum);
+	}
 	
-}
-
-void filterGaussianFunction(BMPImage *image, float sigma) {
-	
-	float filterDimen = 2 * (ceilf(3 * sigma)) + 1;
-
-	float *xFilter = new float[(int) filterDimen];
-	float *yFilter = new float[(int)filterDimen];
-
-	for (int i = 0; i < )
+	*dimen = filterDimen; //"return" the dimension of the filter
+	return filter; //return the filter
 }
 
 void filterSharpeningFunction() {
@@ -190,28 +231,43 @@ void resizeFunction() {
 //argv[3] - write image file name
 int main(int argc, char** argv) {
 
+	BMPImage image = BMPImage(); //new image to reflect greyscale and any filters applied
+	float filterVal = 0.0f;
+	float sigma = 0.0f;
+	float *filter = NULL;
+	int filterDimen = 0;
+
 	if (argc != 4) {
 		cout << "Incorrect usage - proper usage: " << argv[0] << " functionNumber inputFile outputFile\n";
 		cout << "\nfunctionNumber options:\n1. greyscaleFunction\n2. correlationFunction\n3. filterGuassianFunction\n4. filterShapeningFunction\n5. resizeFunction\n";
 		return 0;
 	}
 
-	int functionNumber = atoi(argv[1]);
-	BMPImage image = BMPImage();
 	image.load(argv[2]);
-	greyscaleFunction(&image);
+	greyscaleFunction(&image); //apply greyscale function
 
-	switch (functionNumber) {
+	switch (atoi(argv[1])) {
 	case 1:
+		//greyscale applied, we're done
 		break;
 	case 2:
-		float filterVal = float(1.0f / 49.0f);
-		correlationFunction(&image, filterVal, 7, 7);
+		filterVal = float(1.0f / 49.0f);
+		filterDimen = 7;
+		//apply box filter to image
+		correlationFunction(&image, filterVal, filterDimen);
 		break;
 	case 3:
-		float sigma = 1.5;
-		filterGaussianFunction(&image, sigma);
+		sigma = 1.5;
+		//get filter and dimensions of the filter
+		filter = filterGaussianFunction(sigma, &filterDimen);
+		//apply filter to the image
+		correlationFunction(&image, filter, filterDimen);
+		delete[] filter;
+		filter = NULL;
 		break;
+	case 4:
+		sigma = 1.5;
+		filter = filterGaussianFunction(sigma, &filterDimen);
 	}
 	image.save(argv[3]);
 	
