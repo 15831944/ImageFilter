@@ -5,6 +5,16 @@
 
 using namespace std;
 
+void clampValues(float *val) {
+
+	if (*val > 1.0f) {
+		*val = 1.0f;
+	}
+	if (*val < 0.0f) {
+		*val = 0.0f;
+	}
+}
+
 /*
 	This function takes in a color BMPImage and outputs a greyscale version of the image.
 */
@@ -46,11 +56,13 @@ void correlationFunction(BMPImage *image, float filter, int n) {
 
 				int offsetXCoord = x + i;
 
+				//padding left
 				if (offsetXCoord <= 0) {
 					//use left most value in row
 					image->readPixel(0, y, readVal, readVal, readVal);
 					writeVal += readVal * filterVal;
 				}
+				//padding right
 				else if (offsetXCoord >= image->getXSize() - 1) {
 					//use right most value in row
 					image->readPixel(image->getXSize() - 1, y, readVal, readVal, readVal);
@@ -63,6 +75,7 @@ void correlationFunction(BMPImage *image, float filter, int n) {
 				}
 
 			}
+			clampValues(&writeVal);
 			image->writePixel(x, y, writeVal, writeVal, writeVal);
 		}
 	}
@@ -79,13 +92,13 @@ void correlationFunction(BMPImage *image, float filter, int n) {
 
 				int offsetYCoord = y + i;
 
-				//padding left
+				//padding top
 				if (offsetYCoord <= 0) {
 					//use top most value in column
 					image->readPixel(x, 0, readVal, readVal, readVal);
 					writeVal += readVal * filterVal;
 				}
-				//padding right
+				//padding bottom
 				else if (offsetYCoord >= image->getYSize() - 1) {
 					//use top most value in column
 					image->readPixel(x, image->getYSize() - 1, readVal, readVal, readVal);
@@ -97,7 +110,7 @@ void correlationFunction(BMPImage *image, float filter, int n) {
 					writeVal += readVal * filterVal;
 				}
 
-			}
+			}clampValues(&writeVal);
 			image->writePixel(x, y, writeVal, writeVal, writeVal);
 		}
 	}
@@ -112,8 +125,8 @@ void correlationFunction(BMPImage *image, float *filter, int n) {
 
 	float readVal, writeVal;
 
-	for (int x = 0; x < image->getXSize() - 1; x++) {
-		for (int y = 0; y < image->getYSize() - 1; y++) {
+	for (int x = 0; x < image->getXSize(); x++) {
+		for (int y = 0; y < image->getYSize(); y++) {
 
 			writeVal = 0;
 			readVal = 0;
@@ -143,12 +156,13 @@ void correlationFunction(BMPImage *image, float *filter, int n) {
 				}
 				j++; //next location in filter
 			}
+			clampValues(&writeVal);
 			image->writePixel(x, y, writeVal, writeVal, writeVal);
 		}
 	}
 	
-	for (int x = 0; x < image->getXSize() - 1; x++) {
-		for (int y = 0; y < image->getYSize() - 1; y++) {
+	for (int x = 0; x < image->getXSize(); x++) {
+		for (int y = 0; y < image->getYSize(); y++) {
 
 			writeVal = 0;
 			readVal = 0;
@@ -178,6 +192,7 @@ void correlationFunction(BMPImage *image, float *filter, int n) {
 				}
 				j++; //next location in filter
 			}
+			clampValues(&writeVal);
 			image->writePixel(x, y, writeVal, writeVal, writeVal);
 		}
 	}
@@ -217,12 +232,35 @@ float* filterGaussianFunction(float sigma, int *dimen) {
 	return filter; //return the filter
 }
 
-void filterSharpeningFunction() {
+/*
+	Creates a sharpening filter. This function takes in a value for sigma, a pointer to a 1D Gaussian filter
+	and the dimension of the filter. The function will subtract the Gaussian filter from an all-pass filter
+	with a center value of 2, with the rest being zero. The function returns the filter T-G.
+*/
+float* filterSharpeningFunction(float sigma, float *filter, int dimen) {
 
+	for (int i = 0; i < dimen; i++) {
+		if (i == (dimen / 2)) {
+			filter[i] = 2 - filter[i]; //center value of filter T is 2, subtract the center gaussian filter value
+		}
+		else {
+			filter[i] *= -1.0f; //all other values of T are 0, so subtract gaussian filter value at this position
+		}
+	}
+	return filter;
 }
 
-void resizeFunction() {
+void resizeFunction(BMPImage *image, float scale) {
 
+	BMPImage scaledImage = BMPImage(image->getXSize() * scale, image->getYSize() * scale);
+
+	int xLeft, xRight, yTop, yBot;
+	//for all pixels in the scaled image
+	for (int scaledX = 0; scaledX < scaledImage.getXSize(); scaledX++) {
+		for (int scaledY = 0; scaledY < scaledImage.getYSize(); scaledY++) {
+			
+		}
+	}
 }
 
 //argv[0] - program name
@@ -249,6 +287,7 @@ int main(int argc, char** argv) {
 	switch (atoi(argv[1])) {
 	case 1:
 		//greyscale applied, we're done
+		image.save(argv[3]);
 		break;
 	case 2:
 		filterVal = float(1.0f / 49.0f);
@@ -256,6 +295,7 @@ int main(int argc, char** argv) {
 		//apply box filter to image
 		correlationFunction(&image, filterVal, filterDimen);
 		break;
+		image.save(argv[3]);
 	case 3:
 		sigma = 1.5;
 		//get filter and dimensions of the filter
@@ -264,12 +304,16 @@ int main(int argc, char** argv) {
 		correlationFunction(&image, filter, filterDimen);
 		delete[] filter;
 		filter = NULL;
+		image.save(argv[3]);
 		break;
 	case 4:
 		sigma = 1.5;
 		filter = filterGaussianFunction(sigma, &filterDimen);
+		filter = filterSharpeningFunction(sigma, filter, filterDimen);
+		correlationFunction(&image, filter, filterDimen);
+		delete[] filter;
+		filter = NULL;
+		image.save(argv[3]);
+		break;
 	}
-	image.save(argv[3]);
-	
-
 }
