@@ -1,6 +1,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include "BMPImage.h"
 
 BMPImage::BMPImage() {
@@ -104,7 +105,13 @@ int BMPImage::load(char *filename)
 
     /*  No 100% errorchecking anymore!!! */
 
-    /*  read the width */    this->sizeX = getint (file);
+    /*  read the width */    
+	this->sizeX = getint (file);
+	//fixes error for width not multiples of 4
+	int remainder = (int) fmodl(this->sizeX, 4L);
+	if (remainder != 0) {
+		this->sizeX += (4 - remainder);
+	}
     
     /*  read the height */ 
     this->sizeY = getint (file);
