@@ -250,17 +250,69 @@ float* filterSharpeningFunction(float sigma, float *filter, int dimen) {
 	return filter;
 }
 
-void resizeFunction(BMPImage *image, float scale) {
+void resizeFunction(BMPImage *image, float scale, char *saveName) {
+	float temp1 = image->getXSize() * scale;
+	float temp2 = image->getYSize() * scale;
 
-	BMPImage scaledImage = BMPImage(image->getXSize() * scale, image->getYSize() * scale);
+	/* compute the image size */
+	int remainder = (int)fmodl(temp1, 4L);
+	if (remainder != 0) {
+		temp1 += (4 - remainder);
+	}
+	BMPImage scaledImage = BMPImage(temp1, temp2);
 
 	int xLeft, xRight, yTop, yBot;
+	float topLeftVal, topRightVal, botLeftVal, botRightVal;
+	float weightX, weightY;
+	float leftBorderVal, rightBorderVal;
+	float finalVal;
 	//for all pixels in the scaled image
 	for (int scaledX = 0; scaledX < scaledImage.getXSize(); scaledX++) {
 		for (int scaledY = 0; scaledY < scaledImage.getYSize(); scaledY++) {
 			
+			//get coordinates of surrounding pixels in original image
+			xLeft = scaledX / scale;
+			//make sure we don't exceed bounds of image
+			if (xLeft == image->getXSize() - 1) {
+				xRight = xLeft;
+			}
+			else {
+				xRight = xLeft + 1;
+			}
+			
+			yTop = scaledY / scale;
+			//make sure we don't exceed bounds of image
+			if (yTop == image->getYSize() - 1) {
+				yBot = yTop;
+			}
+			else {
+				yBot = yTop + 1;
+			}
+
+			//get color value at surrounding pixels in original image
+			image->readPixel(xLeft, yTop, topLeftVal, topLeftVal, topLeftVal); //top left value
+			image->readPixel(xRight, yTop, topRightVal, topRightVal, topRightVal); //top right value
+			image->readPixel(xLeft, yBot, botLeftVal, botLeftVal, botLeftVal); //bot left value
+			image->readPixel(xRight, yBot, botRightVal, botRightVal, botRightVal); //bot right value
+
+			//get weight in the y direction
+			weightY = (scaledY / scale) - yTop;
+
+			//get color value on left border at the y value
+			leftBorderVal = (weightY * (botLeftVal - topLeftVal)) + topLeftVal;
+			//get color value on right border at the y value
+			rightBorderVal = (weightY * (botRightVal - topRightVal)) + topRightVal;
+
+			//get weight in the x direction
+			weightX = (scaledX / scale) - xLeft;
+
+			//get color between the two weighted border values
+			finalVal = (weightX * (rightBorderVal - leftBorderVal)) + leftBorderVal;
+
+			scaledImage.writePixel(scaledX, scaledY, finalVal, finalVal, finalVal);
 		}
 	}
+	scaledImage.save(saveName);
 }
 
 //argv[0] - program name
@@ -275,9 +327,10 @@ int main(int argc, char** argv) {
 	float *filter = NULL;
 	int filterDimen = 0;
 
-	if (argc != 4) {
+	if (argc < 4) {
 		cout << "Incorrect usage - proper usage: " << argv[0] << " functionNumber inputFile outputFile\n";
 		cout << "\nfunctionNumber options:\n1. greyscaleFunction\n2. correlationFunction\n3. filterGuassianFunction\n4. filterShapeningFunction\n5. resizeFunction\n";
+		cout << "    For resize function, add input scale after output file location\n";
 		return 0;
 	}
 
@@ -294,10 +347,10 @@ int main(int argc, char** argv) {
 		filterDimen = 7;
 		//apply box filter to image
 		correlationFunction(&image, filterVal, filterDimen);
-		break;
 		image.save(argv[3]);
+		break;
 	case 3:
-		sigma = 1.5;
+		sigma = 10;
 		//get filter and dimensions of the filter
 		filter = filterGaussianFunction(sigma, &filterDimen);
 		//apply filter to the image
@@ -315,5 +368,7 @@ int main(int argc, char** argv) {
 		filter = NULL;
 		image.save(argv[3]);
 		break;
+	case 5:
+		resizeFunction(&image, atof(argv[4]), argv[3]);
 	}
 }

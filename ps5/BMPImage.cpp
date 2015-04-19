@@ -199,7 +199,6 @@ int BMPImage::save(char *filename)
       return 0;
     }
     
-	/* compute the image size */
 	size = this->sizeX * this->sizeY * 3;//4;
 
 	/* set up header info */
