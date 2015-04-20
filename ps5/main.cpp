@@ -316,9 +316,10 @@ void resizeFunction(BMPImage *image, float scale, char *saveName) {
 }
 
 //argv[0] - program name
-//argv[1] - function number
-//argv[2] - read image file name
-//argv[3] - write image file name
+//argv[1] - read image file name
+//argv[2] - write image file name
+//argv[3] - function number
+//argv[4] - value (sigma or box filter dimension)
 int main(int argc, char** argv) {
 
 	BMPImage image = BMPImage(); //new image to reflect greyscale and any filters applied
@@ -328,47 +329,57 @@ int main(int argc, char** argv) {
 	int filterDimen = 0;
 
 	if (argc < 4) {
-		cout << "Incorrect usage - proper usage: " << argv[0] << " functionNumber inputFile outputFile\n";
-		cout << "\nfunctionNumber options:\n1. greyscaleFunction\n2. correlationFunction\n3. filterGuassianFunction\n4. filterShapeningFunction\n5. resizeFunction\n";
-		cout << "    For resize function, add input scale after output file location\n";
+		cout << "Incorrect usage - proper usage: " << argv[0] << " inputFile outputFile functionNumber value filterDimension\n";
+		cout << "\nfunctionNumber options:\n1. greyscaleFunction - value not needed\n";
+		cout << "2.correlationFunction - dimension needed (odd value for dimension)\n";
+		cout << "3.filterGuassianFunction - sigma value needed\n";
+		cout << "4.filterSharpeningFunction - sigma value needed\n";
+		cout << "5.resizeFunction - scale value needed\n";
+		cout << "    \n";
 		return 0;
 	}
 
-	image.load(argv[2]);
+	image.load(argv[1]);
 	greyscaleFunction(&image); //apply greyscale function
 
-	switch (atoi(argv[1])) {
+	switch (atoi(argv[3])) {
 	case 1:
 		//greyscale applied, we're done
-		image.save(argv[3]);
+		image.save(argv[2]);
 		break;
 	case 2:
-		filterVal = float(1.0f / 49.0f);
-		filterDimen = 7;
+		//get filter value and dimension
+		filterDimen = atoi(argv[4]);
+		filterVal = 1.0f / (filterDimen * filterDimen);
 		//apply box filter to image
 		correlationFunction(&image, filterVal, filterDimen);
-		image.save(argv[3]);
+		image.save(argv[2]);
 		break;
 	case 3:
-		sigma = 10;
+		sigma = atof(argv[4]);
 		//get filter and dimensions of the filter
 		filter = filterGaussianFunction(sigma, &filterDimen);
 		//apply filter to the image
 		correlationFunction(&image, filter, filterDimen);
 		delete[] filter;
 		filter = NULL;
-		image.save(argv[3]);
+		image.save(argv[2]);
 		break;
 	case 4:
-		sigma = 1.5;
+		//get sigma value
+		sigma = atof(argv[4]);
+		//get gaussian filter
 		filter = filterGaussianFunction(sigma, &filterDimen);
+		//get sharpening filter (T-G)
 		filter = filterSharpeningFunction(sigma, filter, filterDimen);
+		//apply filter
 		correlationFunction(&image, filter, filterDimen);
 		delete[] filter;
 		filter = NULL;
-		image.save(argv[3]);
+		image.save(argv[2]);
 		break;
 	case 5:
-		resizeFunction(&image, atof(argv[4]), argv[3]);
+		resizeFunction(&image, atof(argv[4]), argv[2]);
+		break;
 	}
 }
