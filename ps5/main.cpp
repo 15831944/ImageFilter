@@ -1,3 +1,9 @@
+/*
+	CMSC427 Spring 2015 Problem Set 5
+	Author: Brian Summers summers.brian.cs@gmail.com
+	110656609
+	4/21/15
+*/
 #include <stdlib.h>
 #include <iostream>
 #include <math.h>
@@ -215,7 +221,9 @@ float* filterGaussianFunction(float sigma, int *dimen) {
 	//populate the filter
 	for (int i = -1 * (filterDimen / 2); i <= (filterDimen / 2); i++) {
 		//calculate filter value and place in filter
-		filter[j] = sqrt(1 / (2 * sigma * sqrt(2 * PI))) *exp(-1 * (i * i) / (2 * sigma * sigma));
+		//note: I square root the constant because I apply this filter twice, once in x direction
+		//and once in the y, in the correlation function to simulate a separable filter
+		filter[j] = sqrt(1 / (sigma * sqrt(2 * PI))) * exp(-1 * (i * i) / (2 * sigma * sigma));
 		j++;
 	}
 
@@ -250,7 +258,13 @@ float* filterSharpeningFunction(float sigma, float *filter, int dimen) {
 	return filter;
 }
 
-void resizeFunction(BMPImage *image, float scale, char *saveName) {
+/*
+	Resizes an image to the scale value. This function takes in a BMPImage, a scale, and a filename to save the
+	new image. The function will take the image parameter and create a new image that is a scaled version of
+	the original, and will save the new scaled image to the saveName parameter. The function uses bilinear
+	interpolation to approximate the pixel values in the new image based on the original.
+*/
+BMPImage* resizeFunction(BMPImage *image, float scale, char *saveName) {
 	float temp1 = image->getXSize() * scale;
 	float temp2 = image->getYSize() * scale;
 
@@ -259,7 +273,7 @@ void resizeFunction(BMPImage *image, float scale, char *saveName) {
 	if (remainder != 0) {
 		temp1 += (4 - remainder);
 	}
-	BMPImage scaledImage = BMPImage(temp1, temp2);
+	BMPImage *scaledImage = new BMPImage(temp1, temp2);
 
 	int xLeft, xRight, yTop, yBot;
 	float topLeftVal, topRightVal, botLeftVal, botRightVal;
@@ -267,8 +281,8 @@ void resizeFunction(BMPImage *image, float scale, char *saveName) {
 	float leftBorderVal, rightBorderVal;
 	float finalVal;
 	//for all pixels in the scaled image
-	for (int scaledX = 0; scaledX < scaledImage.getXSize(); scaledX++) {
-		for (int scaledY = 0; scaledY < scaledImage.getYSize(); scaledY++) {
+	for (int scaledX = 0; scaledX < scaledImage->getXSize(); scaledX++) {
+		for (int scaledY = 0; scaledY < scaledImage->getYSize(); scaledY++) {
 			
 			//get coordinates of surrounding pixels in original image
 			xLeft = scaledX / scale;
@@ -309,10 +323,210 @@ void resizeFunction(BMPImage *image, float scale, char *saveName) {
 			//get color between the two weighted border values
 			finalVal = (weightX * (rightBorderVal - leftBorderVal)) + leftBorderVal;
 
-			scaledImage.writePixel(scaledX, scaledY, finalVal, finalVal, finalVal);
+			scaledImage->writePixel(scaledX, scaledY, finalVal, finalVal, finalVal);
 		}
 	}
-	scaledImage.save(saveName);
+	return scaledImage;
+}
+
+void bilateralFilterFunction(BMPImage *image, float sigma1, float sigma2, int width) {
+
+	const float PI = 3.1415927;
+	const float k = (1 / (sigma2 * sqrt(2 * PI)));
+	float gValDist = 0.0f;
+	float gValIntense = 0.0f;
+	float pixelReadVal = 0.0f;
+	float pixelWriteVal = 0.0f;
+	float neighborVal = 0.0f;
+	float normalizationSum = 0.0f;
+	float neighborReadVal = 0.0f;
+	float intenseDiff = 0.0f;
+
+	for (int x = 0; x < image->getXSize(); x++) {
+		for (int y = 0; y < image->getYSize(); y++) {
+			
+			image->readPixel(x, y, pixelReadVal, pixelReadVal, pixelReadVal); //get intensity at the pixel
+
+			normalizationSum = 0.0f;
+			neighborVal = 0.0f;
+			pixelWriteVal = 0.0f;
+
+			float pVal = 0.0f;
+			int weightSum = 0.0f;
+			for (int i = x - width; i < x + width; i++) {
+				for (int j = y - width; j < y + width; j++) {
+					weightSum += gaussianWeight(image, x, y, i, j, sigma1, sigma2);
+				}
+			}
+
+			for (int i = x - width; i < x + width; i++) {
+				for (int j = y - width; j < y + width; j++) {
+					float nVal = 0.0f;
+
+					if (k <= 0 && l <= 0) {
+						image->readPixel(0, 0, i2, i2, i2);
+					}
+					else if (k >= image->getXSize() - 1 && l <= 0) {
+						image->readPixel(image->getXSize() - 1, 0, i2, i2, i2);
+					}
+					else if (k <= 0 && l >= image->getYSize() - 1) {
+						image->readPixel(0, image->getYSize() - 1, i2, i2, i2);
+					}
+					else if (k >= image->getXSize() - 1 && l >= image->getYSize() - 1) {
+						image->readPixel(image->getXSize() - 1, image->getYSize() - 1, i2, i2, i2);
+					}
+					else if (k <= 0) {
+						image->readPixel(0, l, i2, i2, i2);
+					}
+					else if (k >= image->getXSize() - 1) {
+						image->readPixel(image->getXSize() - 1, l, i2, i2, i2);
+					}
+					else if (l <= 0) {
+						image->readPixel(k, 0, i2, i2, i2);
+					}
+					else if (l >= image->getYSize() - 1) {
+						image->readPixel(k, image->getYSize() - 1, i2, i2, i2);
+					}
+					else {
+						image->readPixel(k, l, i2, i2, i2);
+					}
+				}
+			}
+
+			
+
+			/*
+			//go through neighboring pixels
+			for (int i = -1 * width; i <= width; i++) {
+				
+				int offsetXCoord = x + i;
+
+				for (int j = -1 * width; j <= width; j++) {
+
+					int offsetYCoord = y + j;
+
+					gValDist = (1 / (sigma1 * sqrt(2 * PI))) * exp(-1 * (i * i) / (2 * sigma1 * sigma1)) * exp(-1 * (j * j) / (2 * sigma1 * sigma1));
+
+
+					
+					if (offsetXCoord <= 0 && offsetYCoord <= 0) {
+						//top left value
+						image->readPixel(0, 0, neighborReadVal, neighborReadVal, neighborReadVal);
+						intenseDiff = fabsf(pixelReadVal - neighborReadVal);
+						gValIntense = k * exp(-1 * (intenseDiff * intenseDiff) / (2 * sigma2 * sigma2));
+						neighborVal = neighborReadVal * gValDist * gValIntense;
+						normalizationSum += gValDist * gValIntense;
+					}
+					else if (offsetXCoord >= image->getXSize() - 1 && offsetYCoord <= 0) {
+						//top right value
+						image->readPixel(image->getXSize() - 1, 0, neighborReadVal, neighborReadVal, neighborReadVal);
+						intenseDiff = fabsf(pixelReadVal - neighborReadVal);
+						gValIntense = k * exp(-1 * (intenseDiff * intenseDiff) / (2 * sigma2 * sigma2));
+						neighborVal = neighborReadVal * gValDist * gValIntense;
+						normalizationSum += gValDist * gValIntense;
+					}
+					else if (offsetXCoord <= 0 && offsetYCoord >= image->getYSize() - 1) {
+						//bot left value
+						image->readPixel(0, image->getYSize() - 1, neighborReadVal, neighborReadVal, neighborReadVal);
+						intenseDiff = fabsf(pixelReadVal - neighborReadVal);
+						gValIntense = k * exp(-1 * (intenseDiff * intenseDiff) / (2 * sigma2 * sigma2));
+						neighborVal = neighborReadVal * gValDist * gValIntense;
+						normalizationSum += gValDist * gValIntense;
+					}
+					else if (offsetXCoord >= image->getXSize() - 1 && offsetYCoord >= image->getYSize() - 1) {
+						//bot right value
+						image->readPixel(image->getXSize() - 1, image->getYSize() - 1, neighborReadVal, neighborReadVal, neighborReadVal);
+						intenseDiff = fabsf(pixelReadVal - neighborReadVal);
+						gValIntense = k * exp(-1 * (intenseDiff * intenseDiff) / (2 * sigma2 * sigma2));
+						neighborVal = neighborReadVal * gValDist * gValIntense;
+						normalizationSum += gValDist * gValIntense;
+					}
+					else if (offsetXCoord <= 0) {
+						//use left most value in row
+						image->readPixel(0, offsetYCoord, neighborReadVal, neighborReadVal, neighborReadVal);
+						intenseDiff = fabsf(pixelReadVal - neighborReadVal);
+						gValIntense = k * exp(-1 * (intenseDiff * intenseDiff) / (2 * sigma2 * sigma2));
+						neighborVal = neighborReadVal * gValDist * gValIntense;
+						normalizationSum += gValDist * gValIntense;
+					}
+					else if (offsetXCoord >= image->getXSize() - 1) {
+						//use right most value in row
+						image->readPixel(image->getXSize() - 1, offsetYCoord, neighborReadVal, neighborReadVal, neighborReadVal);
+						intenseDiff = fabsf(pixelReadVal - neighborReadVal);
+						gValIntense = k * exp(-1 * (intenseDiff * intenseDiff) / (2 * sigma2 * sigma2));
+						neighborVal = neighborReadVal * gValDist * gValIntense;
+						normalizationSum += gValDist * gValIntense;
+					}
+					else if (offsetYCoord <= 0) {
+						//use top most value in column
+						image->readPixel(offsetXCoord, 0, neighborReadVal, neighborReadVal, neighborReadVal);
+						intenseDiff = fabsf(pixelReadVal - neighborReadVal);
+						gValIntense = k * exp(-1 * (intenseDiff * intenseDiff) / (2 * sigma2 * sigma2));
+						neighborVal = neighborReadVal * gValDist * gValIntense;
+						normalizationSum += gValDist * gValIntense;
+					}
+					else if (offsetYCoord >= image->getYSize() - 1) {
+						//use bottom most value in column
+						image->readPixel(offsetXCoord, image->getYSize() - 1, neighborReadVal, neighborReadVal, neighborReadVal);
+						intenseDiff = fabsf(pixelReadVal - neighborReadVal);
+						gValIntense = k * exp(-1 * (intenseDiff * intenseDiff) / (2 * sigma2 * sigma2));
+						neighborVal = neighborReadVal * gValDist * gValIntense;
+						normalizationSum += gValDist * gValIntense;
+					}
+					else {
+						//use value in image
+						image->readPixel(offsetXCoord, offsetYCoord, neighborReadVal, neighborReadVal, neighborReadVal);
+						intenseDiff = fabsf(pixelReadVal - neighborReadVal);
+						gValIntense = k * exp(-1 * (intenseDiff * intenseDiff) / (2 * sigma2 * sigma2));
+						neighborVal = neighborReadVal * gValDist * gValIntense;
+						normalizationSum += gValDist * gValIntense;
+					}
+					
+					pixelWriteVal += neighborVal;
+					
+				}
+			}
+			
+			pixelWriteVal /= normalizationSum;
+			*/
+
+			image->writePixel(x, y, pixelWriteVal, pixelWriteVal, pixelWriteVal);
+		}
+	}
+}
+
+float gaussianWeight(BMPImage *image, int i, int j, int k, int l, float sigma1, float sigma2) {
+	float i1 = 0.0f, i2 = 0.0f;
+
+	if (k <= 0 && l <= 0) {
+		image->readPixel(0, 0, i2, i2, i2);
+	}
+	else if (k >= image->getXSize() - 1 && l <= 0) {
+		image->readPixel(image->getXSize() - 1, 0, i2, i2, i2);
+	}
+	else if (k <= 0 && l >= image->getYSize() - 1) {
+		image->readPixel(0, image->getYSize() - 1, i2, i2, i2);
+	}
+	else if (k >= image->getXSize() - 1 && l >= image->getYSize() - 1) {
+		image->readPixel(image->getXSize() - 1, image->getYSize() - 1, i2, i2, i2);
+	}
+	else if (k <= 0) {
+		image->readPixel(0, l, i2, i2, i2);
+	}
+	else if (k >= image->getXSize() - 1) {
+		image->readPixel(image->getXSize() - 1, l, i2, i2, i2);
+	}
+	else if (l <= 0) {
+		image->readPixel(k, 0, i2, i2, i2);
+	}
+	else if (l >= image->getYSize() - 1) {
+		image->readPixel(k, image->getYSize() - 1, i2, i2, i2);
+	}
+	else {
+		image->readPixel(k, l, i2, i2, i2);
+	}
+	image->readPixel(i, j, i1, i1, i1);
+	return exp(-1.0f * (((powf((i - k),2) + powf((j - l),2))/(2 * powf(sigma1,2))) - ((powf((i1 - i2),2))/(2 * powf(sigma2,2)))));
 }
 
 //argv[0] - program name
@@ -323,63 +537,106 @@ void resizeFunction(BMPImage *image, float scale, char *saveName) {
 int main(int argc, char** argv) {
 
 	BMPImage image = BMPImage(); //new image to reflect greyscale and any filters applied
+	BMPImage *tempImage = NULL;
+	int functionNumber = 0;
 	float filterVal = 0.0f;
-	float sigma = 0.0f;
+	float sigma1 = 0.0f;
+	float sigma2 = 0.0f;
+	float scale = 0.0f;
 	float *filter = NULL;
 	int filterDimen = 0;
+	int width = 0;
 
-	if (argc < 4) {
-		cout << "Incorrect usage - proper usage: " << argv[0] << " inputFile outputFile functionNumber value filterDimension\n";
-		cout << "\nfunctionNumber options:\n1. greyscaleFunction - value not needed\n";
-		cout << "2.correlationFunction - dimension needed (odd value for dimension)\n";
-		cout << "3.filterGuassianFunction - sigma value needed\n";
-		cout << "4.filterSharpeningFunction - sigma value needed\n";
-		cout << "5.resizeFunction - scale value needed\n";
-		cout << "    \n";
+	if (argc < 3) {
+		cout << "Incorrect usage - proper usage: " << argv[0] << " inputFile outputFile\n";
 		return 0;
 	}
+	
+	cout << "Which function would you like to run?\n1. Greyscale function\n2. Correlation function\n3. Gaussian filter function\n";
+	cout << "4. Sharpening function\n5. Resize function\n6. Bilateral filter function\n\n";
+	cout << "Function number: ";
+	cin >> functionNumber;
 
+	cout << "\nLoading input image...\n";
 	image.load(argv[1]);
+	cout << "Applying greyscale function...\n";
 	greyscaleFunction(&image); //apply greyscale function
 
-	switch (atoi(argv[3])) {
+	switch (functionNumber) {
 	case 1:
 		//greyscale applied, we're done
-		image.save(argv[2]);
 		break;
 	case 2:
 		//get filter value and dimension
-		filterDimen = atoi(argv[4]);
-		filterVal = 1.0f / (filterDimen * filterDimen);
+		float num, denom;
+		cout << "This function assumes a box filter with same value everywhere in the filter\n";
+		cout << "Filter value numerator: ";
+		cin >> num;
+		cout << "Filter value denominator: ";
+		cin >> denom;
+		filterVal = (num / denom);
+		cout << "Dimension of filter (assumes nxn - integer value): ";
+		cin >> filterDimen;
 		//apply box filter to image
+		cout << "Correlating filter onto image...\n";
 		correlationFunction(&image, filterVal, filterDimen);
-		image.save(argv[2]);
 		break;
 	case 3:
-		sigma = atof(argv[4]);
+		cout << "Sigma (float value): ";
+		cin >> sigma1;
 		//get filter and dimensions of the filter
-		filter = filterGaussianFunction(sigma, &filterDimen);
+		cout << "Creating Gaussian filter with sigma...\n";
+		filter = filterGaussianFunction(sigma1, &filterDimen);
 		//apply filter to the image
+		cout << "Correlating Gaussian filter onto image...\n";
 		correlationFunction(&image, filter, filterDimen);
 		delete[] filter;
 		filter = NULL;
-		image.save(argv[2]);
 		break;
 	case 4:
 		//get sigma value
-		sigma = atof(argv[4]);
+		cout << "Sigma (float value): ";
+		cin >> sigma1;
 		//get gaussian filter
-		filter = filterGaussianFunction(sigma, &filterDimen);
+		cout << "Creating Gaussian filter with sigma...\n";
+		filter = filterGaussianFunction(sigma1, &filterDimen);
 		//get sharpening filter (T-G)
-		filter = filterSharpeningFunction(sigma, filter, filterDimen);
+		cout << "Creating sharpening filter with Gaussian filter...\n";
+		filter = filterSharpeningFunction(sigma1, filter, filterDimen);
 		//apply filter
+		cout << "Correlating sharpening filter onto image...\n";
 		correlationFunction(&image, filter, filterDimen);
 		delete[] filter;
 		filter = NULL;
-		image.save(argv[2]);
 		break;
 	case 5:
-		resizeFunction(&image, atof(argv[4]), argv[2]);
+		//get the scale value
+		cout << "Scale (float value): ";
+		cin >> scale;
+		cout << "Resizing image...\n";
+		//resize the image
+		tempImage = resizeFunction(&image, scale, argv[2]);
+		cout << "Saving image to output...\n";
+		tempImage->save(argv[2]);
+		tempImage->~BMPImage();
+		tempImage = NULL;
+		break;
+	case 6:
+		//get the sigma values
+		cout << "Sigma1 (float value): ";
+		cin >> sigma1;
+		cout << "Sigma2 (float value): ";
+		cin >> sigma2;
+		cout << "Width (integer value): ";
+		cin >> width;
+		//apply bilateral filter function
+		cout << "Applying Bilateral filter onto image...\n";
+		bilateralFilterFunction(&image, sigma1, sigma2, width);
 		break;
 	}
+	if (functionNumber != 5) {
+		cout << "Saving image to output...\n";
+		image.save(argv[2]);
+	}
+	cout << "Done!\n";
 }

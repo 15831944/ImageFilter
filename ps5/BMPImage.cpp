@@ -1,3 +1,12 @@
+/*
+	CMSC427 Spring 2015 Problem Set 5
+	Author: Brian Summers summers.brian.cs@gmail.com
+	110656609
+	4/21/15
+
+	Adapted from provided code in Problem Set 3
+*/
+
 #define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 #include <stdlib.h>
