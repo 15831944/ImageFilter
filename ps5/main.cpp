@@ -11,6 +11,57 @@
 
 using namespace std;
 
+
+
+void bilateralFilterFunction(BMPImage *image, float sigma1, float sigma2, int width);
+
+void clampValues(float *val);
+
+void greyscaleFunction(BMPImage *image);
+
+void correlationFunction_1D(BMPImage *image, float filter, int n);
+void correlationFunction(BMPImage *image, float filter, int n);
+/*
+3. 高斯功能
+创建高斯滤波器。 此函数接受sigma和a的值
+指向整数的指针。 该函数将创建一个新的1D滤波器并填充它
+与高斯滤波器的值。 该函数将返回一个指向1D的指针
+过滤器，并将修改整数指针以反映过滤器的维度。
+*/
+float* filterGaussianFunction(float sigma, int *dimen);
+
+/*
+4.锐化功能
+创建锐化滤镜。 此函数接受sigma的值，a
+指向1D高斯滤波器的指针和滤波器的维度。 功能
+将从具有中心值的全通滤波器中减去高斯滤波器
+为2，其余为零。 该函数返回过滤器T-G。
+*/
+float* filterSharpeningFunction(float sigma, float *filter, int dimen);
+/*
+5.调整函数大小
+根据缩放值调整图像大小。 此函数接收一个BMPImage，a
+缩放和保存新图像的文件名。 该功能将拍摄图像
+参数并创建作为原始缩放版本的新图像，以及
+将保存新缩放的图像到saveName参数。 该函数使用
+双线性插值以近似新图像中的像素值
+在原来。
+*/
+BMPImage* resizeFunction(BMPImage *image, float scale, char *saveName);
+
+
+/*
+	在图像上应用双边滤镜
+*/
+void bilateralFilterFunction(BMPImage *image, float sigma1, float sigma2, int width);
+
+float* filterSharpeningFunction(float sigma, float *filter, int dimen);
+
+float gaussianWeight(BMPImage *image, int i, int j, int k, int l, float sigma1, float sigma2);
+
+BMPImage* resizeFunction(BMPImage *image, float scale, char *saveName);
+
+
 void clampValues(float *val) {
 
 	if (*val > 1.0f) {
@@ -70,7 +121,7 @@ void correlationFunction(BMPImage *image, float filter, int n) {
 				}
 				//padding right
 				else if (offsetXCoord >= image->getXSize() - 1) {
-					//use right most value in row
+					//use right most value in row 
 					image->readPixel(image->getXSize() - 1, y, readVal, readVal, readVal);
 					writeVal += readVal * filterVal;
 				}
@@ -127,7 +178,7 @@ void correlationFunction(BMPImage *image, float filter, int n) {
 	to a 1D filter, and the dimension of the 1D filter. This function uses the 1D filter twice 
 	to simulate the affect of applying a separable filter.
 */
-void correlationFunction(BMPImage *image, float *filter, int n) {
+void correlationFunction_1D(BMPImage *image, float *filter, int n) {
 
 	float readVal, writeVal;
 
@@ -358,12 +409,16 @@ void bilateralFilterFunction(BMPImage *image, float sigma1, float sigma2, int wi
 					weightSum += gaussianWeight(image, x, y, i, j, sigma1, sigma2);
 				}
 			}
+			// ZY 添加参数
+			float i2;
+			int l = image->getYSize();
 
 			for (int i = x - width; i < x + width; i++) {
 				for (int j = y - width; j < y + width; j++) {
 					float nVal = 0.0f;
 
 					if (k <= 0 && l <= 0) {
+						// 后面三个参数是 R G B,两种
 						image->readPixel(0, 0, i2, i2, i2);
 					}
 					else if (k >= image->getXSize() - 1 && l <= 0) {
@@ -589,7 +644,9 @@ int main(int argc, char** argv) {
 		filter = filterGaussianFunction(sigma1, &filterDimen);
 		//apply filter to the image
 		cout << "Correlating Gaussian filter onto image...\n";
-		correlationFunction(&image, filter, filterDimen);
+
+		//correlationFunction(&image, filter, filterDimen);
+		correlationFunction(&image, filter[0], filterDimen);
 		delete[] filter;
 		filter = NULL;
 		break;
@@ -605,7 +662,8 @@ int main(int argc, char** argv) {
 		filter = filterSharpeningFunction(sigma1, filter, filterDimen);
 		//apply filter
 		cout << "Correlating sharpening filter onto image...\n";
-		correlationFunction(&image, filter, filterDimen);
+		// correlationFunction(&image, filter[0], filterDimen);
+		correlationFunction(&image, filter[0], filterDimen);
 		delete[] filter;
 		filter = NULL;
 		break;
